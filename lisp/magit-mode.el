@@ -104,6 +104,7 @@ which in turn uses the function specified here."
   :type '(radio (function-item magit-display-buffer-traditional)
                 (function-item magit-display-buffer-same-window-except-diff-v1)
                 (function-item magit-display-buffer-fullframe-status-v1)
+                (function-item magit-display-buffer-fullframe-status-topleft-v1)
                 (function-item magit-display-buffer-fullcolumn-most-v1)
                 (function-item display-buffer)
                 (function :tag "Function")))
@@ -562,6 +563,36 @@ Otherwise, behave like `magit-display-buffer-traditional'."
           'magit-status-mode)
       (display-buffer buffer '(magit--display-buffer-fullframe))
     (magit-display-buffer-traditional buffer)))
+
+(defun magit--display-buffer-topleft (buffer alist)
+  (or (display-buffer-reuse-window buffer alist)
+      (-when-let (window2 (display-buffer-pop-up-window buffer alist))
+        (let ((window1 (get-buffer-window))
+              (buffer1 (current-buffer))
+              (buffer2 (window-buffer window2)))
+          (set-window-buffer window1 buffer2)
+          (set-window-buffer window2 buffer1)
+          (select-window window2)
+          window1))))
+
+(defun magit-display-buffer-fullframe-status-topleft-v1 (buffer)
+  "Display BUFFER, filling entire frame if BUFFER is a status buffer.
+When BUFFER derives from `magit-diff-mode' or
+`magit-process-mode', try to display BUFFER to the top or left of
+the current buffer rather than to the bottom or right, as
+`magit-display-buffer-fullframe-status-v1' would.  Whether the
+split is made vertically or horizontally is determined by
+`split-window-preferred-function'."
+  (display-buffer
+   buffer
+   (cond ((eq (with-current-buffer buffer major-mode)
+              'magit-status-mode)
+          '(magit--display-buffer-fullframe))
+         ((with-current-buffer buffer
+            (derived-mode-p 'magit-diff-mode 'magit-process-mode))
+          '(magit--display-buffer-topleft))
+         (t
+          '(display-buffer-same-window)))))
 
 (defun magit--display-buffer-fullcolumn (buffer alist)
   (-when-let (window (or (display-buffer-reuse-window buffer alist)
